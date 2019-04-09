@@ -4,10 +4,16 @@ from keras.models import Model
 from pypokerengine.players import BasePokerPlayer
 from pypokerengine.engine.card import Card
 
+
 class Group18Player(BasePokerPlayer):
     suits = [Card.SUIT_MAP[key] for key in Card.SUIT_MAP]
     ranks = [Card.RANK_MAP[key] for key in Card.RANK_MAP]
     max_no_of_rounds = 4
+    target_Q = np.zeros((1, 3), dtype=float)
+    old_small_blind_cards = np.zeros((1, len(suits), len(ranks), max_no_of_rounds), dtype=float)
+    old_small_blind_actions = np.zeros((1, 2, 6, 4), dtype=float)
+    old_small_blind_position = np.zeros(1, dtype=float)
+    old_small_blind_features = [old_small_blind_cards, old_small_blind_actions, old_small_blind_position]
 
     def __init__(self):
         super(Group18Player, self).__init__()
@@ -39,7 +45,7 @@ class Group18Player(BasePokerPlayer):
             model = Model(inputs=[input_cards, input_actions, input_position],
                           outputs=out)
             if self.vvh == 0:
-                model.load_weights('./training/q_learning.h5', by_name=True)
+                model.load_weights('./setup/weights.h5', by_name=True)
             model.compile(optimizer='rmsprop', loss='mse')
 
             return model
@@ -105,19 +111,19 @@ class Group18Player(BasePokerPlayer):
                 flop_actions = convert_to_image(self.initial_stack, round_state, 'flop')
 
             elif round_state['street'] == 'turn':
-                turn_cards = [round_state['community_card'][2]]
+                turn_cards = [round_state['community_card'][3]]
                 turn_cards_img = get_street_grid(turn_cards)
                 turn_actions = convert_to_image(self.initial_stack, round_state, 'turn')
 
             elif round_state['street'] == 'river':
-                river_cards = [round_state['community_card'][I]]
+                river_cards = [round_state['community_card'][4]]
                 river_cards_img = get_street_grid(river_cards)
                 river_actions = convert_to_image(self.initial_stack, round_state, 'river')
 
             return {'actions': [preflop_actions, flop_actions, turn_actions, river_actions],
                     'images': [small_blind_cards_img, flop_cards_img, turn_cards_img, river_cards_img]}
 
-        def run_q_learning_algorithm(y, max_replay_size, target_Q, old_state):
+        def run_q_learning_algorithm(y, max_replay_size, target_Q, old_small_blind_features):
             self.all_Q_small_blind = self.model.predict(self.small_blind_features)
             small_blind_action = np.argmax(self.all_Q_small_blind)
             small_blind_reward = 0
@@ -127,7 +133,7 @@ class Group18Player(BasePokerPlayer):
 
                 target_Q[0, small_blind_action] = small_blind_reward
                 self.vvh = self.vvh + 1
-                self.experience_state.append(old_state)
+                self.experience_state.append(old_small_blind_features)
                 self.experience_reward.append(target_Q)
                 if len(self.experience_state) > max_replay_size:
                     del self.experience_state[0]
@@ -152,13 +158,10 @@ class Group18Player(BasePokerPlayer):
                                self.experience_reward[ve],
                                verbose=0)
 
-        target_Q = np.array([[0.0, 0.0]], dtype=float)
-        old_state = np.array([0.0, 0.0, 0.0], dtype=float)
-
         # if the agent has already played an action before then its' previous attributes are stored for reference
         if self.has_played:
-            old_state = self.small_blind_features
-            target_Q = self.all_Q_small_blind
+            Group18Player.old_small_blind_features = self.small_blind_features
+            Group18Player.target_Q = self.all_Q_small_blind
 
         self.has_played = True
 
@@ -180,8 +183,8 @@ class Group18Player(BasePokerPlayer):
         max_replay_size = 40
 
         # run model to choose action
-        if self.has_played:
-            small_blind_action = run_q_learning_algorithm(y, max_replay_size, target_Q, old_state)
+        small_blind_action = run_q_learning_algorithm(y, max_replay_size, Group18Player.target_Q,
+                                                      Group18Player.old_small_blind_features)
 
         train_model()
 
