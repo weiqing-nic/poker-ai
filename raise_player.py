@@ -197,6 +197,7 @@ class Group18Player(BasePokerPlayer):
         for ve in range(len(self.experience_state)):
             self.model.fit(self.experience_state[ve], self.experience_reward[ve], verbose=0)
 
+
         return pick_action()
 
     def receive_game_start_message(self, game_info):
@@ -212,6 +213,7 @@ class Group18Player(BasePokerPlayer):
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
+
         def get_real_reward():
             if winners[0]['uuid'] == self.my_uuid:
                 return winners[0]['stack'] - self.starting_stack
