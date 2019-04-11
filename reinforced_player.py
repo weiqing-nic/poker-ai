@@ -4,7 +4,7 @@ from pypokerengine.utils.game_state_utils import restore_game_state
 
 from raise_player import Group18Player
 
-class RLPLayer(BasePokerPlayer):
+class RLPlayer(BasePokerPlayer):
 
     # Setup Emulator object by registering game information
     def receive_game_start_message(self, game_info):
