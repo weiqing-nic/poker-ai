@@ -14,6 +14,7 @@ class Group18Player(BasePokerPlayer):
     y = 0.9
     e = 0.1
     max_replay_size = 40
+    starting_stack = 10000
 
     def __init__(self):
 
@@ -47,13 +48,14 @@ class Group18Player(BasePokerPlayer):
         self.vvh = 0
         self.action_sb = 3
         # self.table = {}
-        # self.my_uuid = None
+        self.my_uuid = None
         # self.my_cards = []
         self.sb_features = []
         self.experience_state = []
         self.experience_reward = []
         self.has_played = False
         self.model = keras_model()
+        self.targetQ = []
 
     def declare_action(self, valid_actions, hole_card, round_state):
 
@@ -62,8 +64,8 @@ class Group18Player(BasePokerPlayer):
             return Group18Player.suits[suit]
 
         def get_card_y(card):
-            idx = card[1]
-            return Group18Player.ranks[idx]
+            small_or_big_blind_turn = card[1]
+            return Group18Player.ranks[small_or_big_blind_turn]
 
         def get_street_grid(cards):
             grid = np.zeros((4,13))
@@ -71,20 +73,20 @@ class Group18Player(BasePokerPlayer):
                 grid[get_card_x(card), get_card_y(card)] = 1
             return grid
 
-        def convert_to_image_grid(eff_stack, round_state, street):
+        def convert_to_image_grid(player_stack, round_state, street):
             image = np.zeros((2,6))
             actions = round_state["action_histories"][street]
-            idx = 0
-            turns = 0
+            small_or_big_blind_turn = 0
+            idx_of_action = 0
             for action in actions:
                 #max of 12actions per street
-                if 'amount' in action and turns < 6:
-                    image[idx, turns] = action['amount'] / eff_stack
-                    idx += 1
+                if 'amount' in action and idx_of_action < 6:
+                    image[small_or_big_blind_turn, idx_of_action] = action['amount'] / player_stack
+                    small_or_big_blind_turn += 1
 
-                if idx % 2 == 0:
-                    idx = 0
-                    turns += 1
+                if small_or_big_blind_turn % 2 == 0:
+                    small_or_big_blind_turn = 0
+                    idx_of_action += 1
 
             return image
 
@@ -141,7 +143,8 @@ class Group18Player(BasePokerPlayer):
         flop_actions = np.zeros((2,6))
         turn_actions = np.zeros((2,6))
         river_actions = np.ones((2,6))
-        # self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
+
+        self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
         # self.my_cards =  hole_card
         # self.community_card = round_state['community_card']
 
@@ -209,12 +212,23 @@ class Group18Player(BasePokerPlayer):
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
-        # print("winners")
-        # for i in winners:
-        #
-        #     print(i)
+        def get_real_reward():
+            if winners[0]['uuid'] == self.my_uuid:
+                return winners[0]['stack'] - self.starting_stack
+            else:
+                return -(winners[0]['stack'] - self.starting_stack)
 
-        pass
-    
+        reward = get_real_reward()
+        self.targetQ[0, int(self.action_sb)] = int(reward)
+        self.experience_state.append(self.sb_features)
+        self.experience_reward.append(self.targetQ)
+
+        if len(self.experience_state) > Group18Player.max_replay_size:
+            del self.experience_state[0]
+            del self.experience_reward[0]
+
+        for ev in range(len(self.experience_state)):
+            self.model.fit(self.experience_state[ev], self.experience_reward[ev], verbose=0)
+
 def setup_ai():
     return Group18Player()
