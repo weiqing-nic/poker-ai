@@ -1,212 +1,230 @@
+import datetime
 import numpy as np
-from keras.layers import Input, Dense, Conv2D, concatenate, Flatten
+from keras.layers import Input, Dense, Conv2D,concatenate,Flatten
 from keras.models import Model
+
 from pypokerengine.players import BasePokerPlayer
-from pypokerengine.engine.card import Card
+from pypokerengine.api.emulator import Emulator
+from pypokerengine.utils.game_state_utils import restore_game_state
+
 
 class Group18Player(BasePokerPlayer):
-    suits = [Card.SUIT_MAP[key] for key in Card.SUIT_MAP]
-    ranks = [Card.RANK_MAP[key] for key in Card.RANK_MAP]
-    max_no_of_rounds = 4
 
     def __init__(self):
-        super(Group18Player, self).__init__()
-
-        self.vvh = 0
 
         def keras_model():
 
-            input_cards = Input(shape=(len(Group18Player.suits),
-                                       len(Group18Player.ranks),
-                                       Group18Player.max_no_of_rounds),
-                                name="cards_input")
-            input_actions = Input(shape=(2, 6, 4), name="actions_input")
-            input_position = Input(shape=(1,), name="position_input")
+            input_cards = Input(shape=(4,13,4), name="cards_input")
+            input_actions = Input(shape=(2,6,4), name="actions_input")
+            input_position = Input(shape=(1,),name="position_input")
 
-            x1 = Conv2D(32, (2, 2), activation='relu')(input_cards)
-            x2 = Conv2D(32, (2, 2), activation='relu')(input_actions)
-            x3 = Dense(1, activation='relu')(input_position)
+            x1 = Conv2D(32,(2,2),activation='relu')(input_cards)
+            x2 = Conv2D(32,(2,2),activation='relu')(input_actions)
+            x3 = Dense(1,activation='relu')(input_position)
 
-            d1 = Dense(128, activation='relu')(x1)
+            d1 = Dense(128,activation='relu')(x1)
             d1 = Flatten()(d1)
-            d2 = Dense(128, activation='relu')(x2)
+            d2 = Dense(128,activation='relu')(x2)
             d2 = Flatten()(d2)
-            x = concatenate([d1, d2, x3])
+            x = concatenate([d1,d2,x3])
             x = Dense(128)(x)
             x = Dense(32)(x)
             out = Dense(3)(x)
 
-            model = Model(inputs=[input_cards, input_actions, input_position],
-                          outputs=out)
+            model = Model(inputs=[input_cards, input_actions,input_position], outputs=out)
             if self.vvh == 0:
-                model.load_weights('./training/q_learning.h5', by_name=True)
+                model.load_weights('setup/weights.h5', by_name=True)
             model.compile(optimizer='rmsprop', loss='mse')
 
             return model
 
-        self.table = {}
-        self.initial_stack = 0
+        self.vvh = 0
+        self.action_sb = 3
+        # self.table = {}
+        # self.my_uuid = None
+        # self.my_cards = []
+        self.sb_features = []
         self.experience_state = []
         self.experience_reward = []
         self.has_played = False
         self.model = keras_model()
-        self.all_Q_small_blind = np.array([[0.0, 0.0]], dtype=float)
-        self.small_blind_features = np.array([0.0, 0.0, 0.0], dtype=float)
-        self.small_blind_position = -1
 
     def declare_action(self, valid_actions, hole_card, round_state):
 
-        def get_suit_index(card):
-            return Group18Player.suits.index(card[0])
+        def getcardx(card):
+            suit = card[0]
+            if(suit == 'S'):
+                return 0
+            elif(suit == 'H'):
+                return 1
+            elif(suit=='D'):
+                return 2
+            elif(suit=='C'):
+                return 3
 
-        def get_rank_index(card):
-            return Group18Player.ranks.index(card[1])
+        def getcardy(card):
+            index = card[1]
+            if(index=='A'):
+                return 12
+            elif(index=='K'):
+                return 11
+            elif(index=='Q'):
+                return 10
+            elif(index=='J'):
+                return 9
+            elif(index=='T'):
+                return 8
+            else:
+                return int(index)-2
 
-        def get_street_grid(cards):
-            grid = np.zeros(
-                (len(Group18Player.suits), len(Group18Player.ranks)))
+        def getstreetgrid(cards):
+            grid = np.zeros((4,13))
             for card in cards:
-                np.put(grid[get_suit_index(card)], [get_rank_index(card)], 1)
+                grid[getcardx(card),getcardy(card)] = 1
             return grid
 
-        def convert_to_image(starting_stack, round_state, street):
-            image = np.zeros((2, 6))
+        def converttoimagemeth(eff_stack,round_state,street):
+            image = np.zeros((2,6))
             actions = round_state["action_histories"][street]
             index = 0
             turns = 0
             for action in actions:
-                # max of 12 actions per street
-                if 'amount' in action and turns < 6:
-                    image[index, turns] = action['amount'] / starting_stack
+                #max of 12actions per street
+                if ('amount' in action and turns < 6):
+                    image[index,turns] = action['amount'] / eff_stack
                     index += 1
 
-                if index % 2 == 0:
-                    index = 0
-                    turns += 1
+                if(index%2 == 0):
+                    index=0
+                    turns +=1
+
             return image
 
-        def get_actions_and_images():
-            # initialization of all the images
-            small_blind_cards_img = get_street_grid(hole_card)
-            flop_cards_img = np.zeros((len(Group18Player.suits), len(Group18Player.ranks)))
-            turn_cards_img = np.zeros((len(Group18Player.suits), len(Group18Player.ranks)))
-            river_cards_img = np.zeros((len(Group18Player.suits), len(Group18Player.ranks)))
+        # Maybe don't modularise this, the program takes up more ram when this is modularised
+        def pick_action():
+            if np.random.rand(1) < e:
+                self.action_sb = np.random.randint(0,4)
 
-            # 2 x 6 matrix representation of all the actions
-            flop_actions = np.zeros((2, 6))
-            turn_actions = np.zeros((2, 6))
-            river_actions = np.ones((2, 6))
-            preflop_actions = convert_to_image(self.initial_stack, round_state,
-                                               'preflop')
+            if self.action_sb == 3 or len(valid_actions) == 2:
+                self.action_sb = 1
 
-            if round_state['street'] == 'flop':
-                flop_cards = round_state['community_card']
-                flop_cards_img = get_street_grid(flop_cards)
-                flop_actions = convert_to_image(self.initial_stack, round_state, 'flop')
+            # game_state,events = emulator.apply_action(game_state,'fold',0)
+            call_action_info = valid_actions[self.action_sb]
+            action = call_action_info["action"]
+            return action
 
-            elif round_state['street'] == 'turn':
-                turn_cards = [round_state['community_card'][2]]
-                turn_cards_img = get_street_grid(turn_cards)
-                turn_actions = convert_to_image(self.initial_stack, round_state, 'turn')
+        def save_weights():
+            new_name = datetime.datetime.now().strftime("%d-%m_%H:%M:%S_") + str(self.vvh) + '.h5'
+            self.model.save_weights(new_name)
 
-            elif round_state['street'] == 'river':
-                river_cards = [round_state['community_card'][I]]
-                river_cards_img = get_street_grid(river_cards)
-                river_actions = convert_to_image(self.initial_stack, round_state, 'river')
+        #####################################################################
+        # SETUPBLOCK - Setup features to train model
 
-            return {'actions': [preflop_actions, flop_actions, turn_actions, river_actions],
-                    'images': [small_blind_cards_img, flop_cards_img, turn_cards_img, river_cards_img]}
+        #bb_cards
+        preflop_cards = [hole_card[0], hole_card[1]]
 
-        def run_q_learning_algorithm(y, max_replay_size, target_Q, old_state):
-            self.all_Q_small_blind = self.model.predict(self.small_blind_features)
-            small_blind_action = np.argmax(self.all_Q_small_blind)
-            small_blind_reward = 0
+        #bb_cards_img = getstreetgrid(bb_cards)
+        preflop_cards_img = getstreetgrid(preflop_cards)
+        flop_cards_img = np.zeros((4,13))
+        turn_cards_img = np.zeros((4,13))
+        river_cards_img = np.zeros((4,13))
 
-            if self.has_played:
-                small_blind_reward += y * np.max(self.all_Q_small_blind)
+        # self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
+        # self.my_cards =  hole_card
+        # self.community_card = round_state['community_card']
 
-                target_Q[0, small_blind_action] = small_blind_reward
-                self.vvh = self.vvh + 1
-                self.experience_state.append(old_state)
-                self.experience_reward.append(target_Q)
-                if len(self.experience_state) > max_replay_size:
-                    del self.experience_state[0]
-                    del self.experience_reward[0]
-            return small_blind_action
+        y = 0.9
+        e = 0.1
+        starting_stack = 10000
+        max_replay_size = 40
 
-        def choose_small_blind_action(small_blind_action):
-            learning_parameter = 0.1
-
-            if np.random.rand(1) < learning_parameter:
-                small_blind_action = np.random.randint(0, 4)
-
-            if small_blind_action == 3 or len(valid_actions) == 2:
-                small_blind_action = 1
-
-            return small_blind_action
-
-        def train_model():
-            print(self.experience_state)
-            for ve in range(len(self.experience_state)):
-                self.model.fit(self.experience_state[ve],
-                               self.experience_reward[ve],
-                               verbose=0)
-
-        target_Q = np.array([[0.0, 0.0]], dtype=float)
-        old_state = np.array([0.0, 0.0, 0.0], dtype=float)
-
-        # if the agent has already played an action before then its' previous attributes are stored for reference
         if self.has_played:
-            old_state = self.small_blind_features
-            target_Q = self.all_Q_small_blind
+            self.old_state = self.sb_features
+            self.targetQ = self.allQ_sb
+            self.oldAction = self.action_sb
+
+        sb_position = 1
+
+        flop_actions = np.zeros((2,6))
+        turn_actions = np.zeros((2,6))
+        river_actions = np.ones((2,6))
+
+        preflop_actions = converttoimagemeth(starting_stack,round_state,'preflop')
+
+        if round_state['street'] == 'flop':
+            flop = round_state['community_card']
+            flop_cards_img = getstreetgrid(flop)
+            flop_actions = converttoimagemeth(starting_stack,round_state,'flop')
+
+        if round_state['street'] == 'turn':
+            turn = round_state['community_card'][3]
+            turn_cards_img = getstreetgrid([turn])
+            turn_actions = converttoimagemeth(starting_stack,round_state,'turn')
+
+        if round_state['street'] == 'river':
+            river = round_state['community_card'][4]
+            river_cards_img = getstreetgrid([river])
+            river_actions = converttoimagemeth(starting_stack,round_state,'river')
+
+        # Form action features
+        actions_feature = np.stack([preflop_actions,flop_actions,turn_actions,river_actions],axis=2).reshape((1,2,6,4))
+
+        # Form card features
+        sb_cards_feature = np.stack([preflop_cards_img, flop_cards_img, turn_cards_img, river_cards_img],
+                                    axis=2).reshape((1,4,13,4))
+        # print("action_feature ---- {}".format(actions_feature.shape))
+        # print("sb_cards_feature ---- {}".format(sb_cards_feature.shape)")
+
+        # All features together
+        self.sb_features = [sb_cards_feature,actions_feature,np.array([sb_position]).reshape((1,1))]
+        # print("All features together ---- {}".format(self.sb_features.shape)")
+
+        # ENDBLOCK
+        #############################################################
+
+        #run model to choose action
+        self.allQ_sb = self.model.predict(self.sb_features)
+        self.action_sb = np.argmax(self.allQ_sb)
+        reward_sb = 0
+
+        if self.has_played:
+            reward_sb += y * np.max(self.allQ_sb)
+            self.targetQ[0, self.action_sb] = reward_sb
+            self.vvh = self.vvh + 1
+            # new_name = 'my_model_weights'
+            # model.fit(self.old_state,self.targetQ,verbose=0)
+            self.experience_state.append(self.old_state)
+            self.experience_reward.append(self.targetQ)
+            if(len(self.experience_state) > max_replay_size):
+                del self.experience_state[0]
+                del self.experience_reward[0]
 
         self.has_played = True
 
-        actions_and_images = get_actions_and_images()
+        for ve in range(len(self.experience_state)):
+            self.model.fit(self.experience_state[ve],self.experience_reward[ve],verbose = 0)
 
-        actions = actions_and_images['actions']
-        actions_feature = np.stack(actions, axis=2).reshape((1, 2, 6, 4))
-
-        images = actions_and_images['images']
-        sb_cards_feature = np.stack(images, axis=2).reshape((1, 4, 13, 4))
-
-        self.small_blind_features = [
-            sb_cards_feature, actions_feature,
-            np.array([self.small_blind_position]).reshape((1, 1))
-        ]
-
-        # setting the hyper parameters
-        y = 0.9
-        max_replay_size = 40
-
-        # run model to choose action
-        if self.has_played:
-            small_blind_action = run_q_learning_algorithm(y, max_replay_size, target_Q, old_state)
-
-        train_model()
-
-        small_blind_action = choose_small_blind_action(small_blind_action)
-
-        return valid_actions["action"][small_blind_action]
+        return pick_action()
 
     def receive_game_start_message(self, game_info):
-        self.initial_stack = game_info['rule']['initial_stack']
-
         pass
 
     def receive_round_start_message(self, round_count, hole_card, seats):
         pass
 
     def receive_street_start_message(self, street, round_state):
-        self.small_blind_position = round_state['small_blind_pos']
         pass
 
     def receive_game_update_message(self, action, round_state):
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
+        # print("winners")
+        # for i in winners:
+        #
+        #     print(i)
+
         pass
-
-
+    
 def setup_ai():
     return Group18Player()
