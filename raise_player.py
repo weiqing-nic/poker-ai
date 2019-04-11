@@ -57,35 +57,34 @@ class Group18Player(BasePokerPlayer):
 
     def declare_action(self, valid_actions, hole_card, round_state):
 
-        def getcardx(card):
+        def get_card_x(card):
             suit = card[0]
-
             return Group18Player.suits[suit]
 
-        def getcardy(card):
-            index = card[1]
-            return Group18Player.ranks[index]
+        def get_card_y(card):
+            idx = card[1]
+            return Group18Player.ranks[idx]
 
-        def getstreetgrid(cards):
+        def get_street_grid(cards):
             grid = np.zeros((4,13))
             for card in cards:
-                grid[getcardx(card),getcardy(card)] = 1
+                grid[get_card_x(card), get_card_y(card)] = 1
             return grid
 
-        def converttoimagemeth(eff_stack,round_state,street):
+        def convert_to_image_grid(eff_stack, round_state, street):
             image = np.zeros((2,6))
             actions = round_state["action_histories"][street]
-            index = 0
+            idx = 0
             turns = 0
             for action in actions:
                 #max of 12actions per street
                 if 'amount' in action and turns < 6:
-                    image[index, turns] = action['amount'] / eff_stack
-                    index += 1
+                    image[idx, turns] = action['amount'] / eff_stack
+                    idx += 1
 
-                if index%2 == 0:
-                    index=0
-                    turns +=1
+                if idx % 2 == 0:
+                    idx = 0
+                    turns += 1
 
             return image
 
@@ -106,6 +105,9 @@ class Group18Player(BasePokerPlayer):
                     del self.experience_state[0]
                     del self.experience_reward[0]
 
+            if self.vvh == 999:
+                save_weights()
+
         # Maybe don't modularise this, the program takes up more ram when this is modularised
         def pick_action():
             if np.random.rand(1) < Group18Player.e:
@@ -120,7 +122,8 @@ class Group18Player(BasePokerPlayer):
             return action
 
         def save_weights():
-            new_name = "setup/" + datetime.datetime.now().strftime("%d-%m_%H:%M:%S_") + str(self.vvh) + '.h5'
+            # new_name = "setup/" + datetime.datetime.now().strftime("%d-%m_%H:%M:%S_") + str(self.vvh) + '.h5'
+            new_name = "setup/" + str(self.vvh) + '.h5'
             self.model.save_weights(new_name)
 
         #####################################################################
@@ -129,8 +132,8 @@ class Group18Player(BasePokerPlayer):
         #bb_cards
         preflop_cards = [hole_card[0], hole_card[1]]
 
-        #bb_cards_img = getstreetgrid(bb_cards)
-        preflop_cards_img = getstreetgrid(preflop_cards)
+        #bb_cards_img = get_street_grid(bb_cards)
+        preflop_cards_img = get_street_grid(preflop_cards)
         flop_cards_img = np.zeros((4,13))
         turn_cards_img = np.zeros((4,13))
         river_cards_img = np.zeros((4,13))
@@ -151,22 +154,22 @@ class Group18Player(BasePokerPlayer):
 
         sb_position = 1
 
-        preflop_actions = converttoimagemeth(starting_stack, round_state, 'preflop')
+        preflop_actions = convert_to_image_grid(starting_stack, round_state, 'preflop')
 
         if round_state['street'] == 'flop':
             flop = round_state['community_card']
-            flop_cards_img = getstreetgrid(flop)
-            flop_actions = converttoimagemeth(starting_stack, round_state, 'flop')
+            flop_cards_img = get_street_grid(flop)
+            flop_actions = convert_to_image_grid(starting_stack, round_state, 'flop')
 
         if round_state['street'] == 'turn':
             turn = round_state['community_card'][3]
-            turn_cards_img = getstreetgrid([turn])
-            turn_actions = converttoimagemeth(starting_stack, round_state, 'turn')
+            turn_cards_img = get_street_grid([turn])
+            turn_actions = convert_to_image_grid(starting_stack, round_state, 'turn')
 
         if round_state['street'] == 'river':
             river = round_state['community_card'][4]
-            river_cards_img = getstreetgrid([river])
-            river_actions = converttoimagemeth(starting_stack, round_state, 'river')
+            river_cards_img = get_street_grid([river])
+            river_actions = convert_to_image_grid(starting_stack, round_state, 'river')
 
         # Form action features
         actions_feature = np.stack([preflop_actions,flop_actions,turn_actions,river_actions],axis=2).reshape((1,2,6,4))
