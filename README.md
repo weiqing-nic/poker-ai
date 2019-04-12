@@ -1,34 +1,15 @@
-## Term Project
+[![Build Status](https://travis-ci.com/cs3243-project-group-18/poker-ai.svg?branch=master)](https://travis-ci.com/cs3243-project-group-18/poker-ai)
+[![Maintainability](https://api.codeclimate.com/v1/badges/2899885f1128dc2d5b42/maintainability)](https://codeclimate.com/github/cs3243-project-group-18/poker-ai/maintainability)
 
-### Set up environment
-using the conda or pyenv
-
-- conda create -n cs3243 python=2.7
-- source activate cs3243
-
-replace the cs3243 with whatever name you want
-https://conda.io/docs/index.html
-
-pip install PyPokerEngine  
-https://ishikota.github.io/PyPokerEngine/
-
-
-
-testing installmement:
-
-```
-import pypokerengine   
-print("hello world")
-```
-
-
+# CS3243 Poker AI Project
 
 ### Create your own player
+
 #### Example player
 
 ```
 
-class RaisedPlayer(BasePokerPlayer):
+class Group18Player(BasePokerPlayer):
 
   def declare_action(self, valid_actions, hole_card, round_state):
     #Implement your code
@@ -49,10 +30,12 @@ class RaisedPlayer(BasePokerPlayer):
   def receive_round_result_message(self, winners, hand_info, round_state):
     pass
 ```
-#### Example Game
+
+### Example Game
+
 The example game is in the example.py
 
-#### Information for the game
+### Information for the game
 ```valid_actions```: vaild action list
 
 

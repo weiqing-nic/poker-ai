@@ -1,0 +1,27 @@
+language: python
+
+matrix:
+  # Use python version 2.7
+  include:
+    - python: 2.7
+
+before_install:
+  #Install Miniconda
+  - wget https://repo.continuum.io/miniconda/Miniconda3-3.7.0-Linux-x86_64.sh -O ~/miniconda.sh
+  - chmod +x ~/miniconda.sh
+  - bash ~/miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - conda update --yes conda
+  
+install:
+  #Setup project environment using conda
+  - conda create --yes -n poker-ai python=2.7
+  - source activate poker-ai  
+  #Install PyPokerEngine via pip
+  - pip install PyPokerEngine
+  - pip install Keras
+  - pip install tensorflow
+  
+script:
+  - python example.py > /dev/null 2>&1 #Run the poker rounds
+ 
