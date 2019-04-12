@@ -144,18 +144,31 @@ class Group18Player(BasePokerPlayer):
         turn_actions = np.zeros((2,6))
         river_actions = np.ones((2,6))
 
+        print(round_state)
+
+        if(round_state['next_player'] == round_state['small_blind_pos']):
+            sb_position = 1
+        else:
+            sb_position = 0
+
+
+        print("sb pos")
+        print(sb_position)
+
         self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
         # self.my_cards =  hole_card
         # self.community_card = round_state['community_card']
 
-        starting_stack = 10000
+        starting_stack = round_state['seats'][round_state['next_player']]['stack']
+        print("starting stack is")
+        print(starting_stack)
 
         if self.has_played:
             self.old_state = self.sb_features
             self.targetQ = self.cur_Q_values
-            # self.old_action = self.action_sb
+            #self.old_action = self.action_sb
 
-        sb_position = 1
+
 
         preflop_actions = convert_to_image_grid(starting_stack, round_state, 'preflop')
 
@@ -221,7 +234,10 @@ class Group18Player(BasePokerPlayer):
                 return -(winners[0]['stack'] - self.starting_stack)
 
         reward = get_real_reward()
-        self.targetQ[0, int(self.action_sb)] = int(reward)
+        
+        #vurh = int(reward
+        self.targetQ = self.model.predict(self.sb_features)
+        self.targetQ[0, self.action_sb] = int(reward)
         self.experience_state.append(self.sb_features)
         self.experience_reward.append(self.targetQ)
 
