@@ -17,7 +17,7 @@ class RandomPlayer(BasePokerPlayer):
         def keras_model():
 
             input_cards = Input(shape=(4,13,4), name="cards_input")
-            input_actions = Input(shape=(2,6,4), name="actions_input")
+            input_actions = Input(shape=(2,5,4), name="actions_input")
             input_position = Input(shape=(1,),name="position_input")
 
             x1 = Conv2D(32,(2,2),activation='relu')(input_cards)
@@ -34,8 +34,8 @@ class RandomPlayer(BasePokerPlayer):
             out = Dense(3)(x)
 
             model = Model(inputs=[input_cards, input_actions,input_position], outputs=out)
-            if (self.vvh == 0):
-                model.load_weights('aaaaaa.h5', by_name=True)
+            # if (self.vvh == 0):
+            #     model.load_weights('aaaaaa.h5', by_name=True)
             model.compile(optimizer='rmsprop', loss='mse')
 
             return model
@@ -52,6 +52,9 @@ class RandomPlayer(BasePokerPlayer):
 
 
     def declare_action(self, valid_actions, hole_card, round_state):
+
+        for gghh in round_state["action_histories"]:
+            print(gghh)
 
 
 
@@ -88,13 +91,17 @@ class RandomPlayer(BasePokerPlayer):
             return grid
 
         def converttoimagemeth(eff_stack,round_state,street):
-            image = np.zeros((2,6))
+            image = np.zeros((2,5))
             actions = round_state["action_histories"][street]
             index = 0
             turns = 0
+
+
             for action in actions:
             #max of 12actions per street
-                if ('amount' in action and turns < 6):
+                if ('amount' in action and turns < 5):
+                    # print("inside action")
+                    # print(action['amount'])
                     image[index,turns] = action['amount'] / eff_stack
                     index += 1
 
@@ -105,11 +112,9 @@ class RandomPlayer(BasePokerPlayer):
             return image
 
 
-        #bb_cards
-        sb_cards = [hole_card[0], hole_card[1]]
+        sb_cards = [ hole_card[0],  hole_card[1] ]
 
-        #bb_cards_img = getstreetgrid(bb_cards)
-        sb_cards_img = getstreetgrid(sb_cards)
+        getcardimg = getstreetgrid(sb_cards)
         flop_cards_img = np.zeros((4,13))
         turn_cards_img = np.zeros((4,13))
         river_cards_img = np.zeros((4,13))
@@ -131,9 +136,9 @@ class RandomPlayer(BasePokerPlayer):
 
         sb_position = 1
 
-        flop_actions = np.zeros((2,6))
-        turn_actions = np.zeros((2,6))
-        river_actions = np.ones((2,6))
+        flop_actions = np.zeros((2,5))
+        turn_actions = np.zeros((2,5))
+        river_actions = np.ones((2,5))
 
         preflop_actions = converttoimagemeth(starting_stack,round_state,'preflop')
 
@@ -151,8 +156,8 @@ class RandomPlayer(BasePokerPlayer):
             river_cards_img = getstreetgrid([river])
             river_actions = converttoimagemeth(starting_stack,round_state,'river')
 
-        self.actions_feature = np.stack([preflop_actions,flop_actions,turn_actions,river_actions],axis=2).reshape((1,2,6,4))
-        sb_cards_feature = np.stack([sb_cards_img,flop_cards_img,turn_cards_img,river_cards_img],
+        self.actions_feature = np.stack([preflop_actions,flop_actions,turn_actions,river_actions],axis=2).reshape((1,2,5,4))
+        sb_cards_feature = np.stack([getcardimg,flop_cards_img,turn_cards_img,river_cards_img],
                                     axis=2).reshape((1,4,13,4))
         # print("action_feature")
         # print(actions_feature.shape)
@@ -235,10 +240,10 @@ class RandomPlayer(BasePokerPlayer):
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
-        # print("winners")
-        # for i in winners:
-        #
-        #     print(i)
+        print("winners")
+        for i in winners:
+
+            print(i)
 
         pass
 
