@@ -36,6 +36,7 @@ class Group18Player(BasePokerPlayer):
             d2 = Flatten()(d2)
             x = concatenate([d1,d2,x3])
             x = Dense(128)(x)
+            x = Dense(128)(x)
             x = Dense(32)(x)
             out = Dense(3)(x)
 
