@@ -132,10 +132,8 @@ class Group18Player(BasePokerPlayer):
         #####################################################################
         # SETUPBLOCK - Setup features to train model
 
-        #bb_cards
         preflop_cards = [hole_card[0], hole_card[1]]
 
-        #bb_cards_img = get_street_grid(bb_cards)
         preflop_cards_img = get_street_grid(preflop_cards)
         flop_cards_img = np.zeros((4,13))
         turn_cards_img = np.zeros((4,13))
@@ -146,7 +144,7 @@ class Group18Player(BasePokerPlayer):
         river_actions = np.ones((2,6))
 
 
-        print(round_state)
+        # print(round_state)
 
         if(round_state['next_player'] == round_state['small_blind_pos']):
             sb_position = 1
@@ -154,23 +152,20 @@ class Group18Player(BasePokerPlayer):
             sb_position = 0
 
 
-        print("sb pos")
-        print(sb_position)
+        # print("sb pos")
+        # print(sb_position)
 
-        self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
         # self.my_cards =  hole_card
         # self.community_card = round_state['community_card']
 
         starting_stack = round_state['seats'][round_state['next_player']]['stack']
-        print("starting stack is")
-        print(starting_stack)
+        # print("starting stack is")
+        # print(starting_stack)
 
         if self.has_played:
             self.old_state = self.sb_features
             self.targetQ = self.cur_Q_values
             #self.old_action = self.action_sb
-
-
 
         preflop_actions = convert_to_image_grid(starting_stack, round_state, 'preflop')
 
