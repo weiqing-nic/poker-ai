@@ -9,12 +9,14 @@ from pypokerengine.utils.game_state_utils import restore_game_state
 
 
 class Group18Player(BasePokerPlayer):
+    my_uuid = ""
     suits = {'S': 0, 'H': 1, 'D': 2, 'C': 3}
     ranks = {'A': 12, 'K': 11, 'Q': 10, 'J': 9, 'T': 8, '9': 7, '8': 6, '7': 5, '6': 4, '5': 3, '4': 2, '3': 1, '2': 0}
     y = 0.9
     e = 0.1
     max_replay_size = 40
-    starting_stack = 10000
+    my_starting_stack = 10000
+    opp_starting_stack = 10000
 
     def __init__(self):
 
@@ -48,7 +50,6 @@ class Group18Player(BasePokerPlayer):
         self.vvh = 0
         self.action_sb = 3
         # self.table = {}
-        self.my_uuid = None
         # self.my_cards = []
         self.sb_features = []
         self.experience_state = []
@@ -144,6 +145,7 @@ class Group18Player(BasePokerPlayer):
         turn_actions = np.zeros((2,6))
         river_actions = np.ones((2,6))
 
+
         print(round_state)
 
         if(round_state['next_player'] == round_state['small_blind_pos']):
@@ -210,14 +212,17 @@ class Group18Player(BasePokerPlayer):
         for ve in range(len(self.experience_state)):
             self.model.fit(self.experience_state[ve], self.experience_reward[ve], verbose=0)
 
-
         return pick_action()
 
     def receive_game_start_message(self, game_info):
-        pass
+        Group18Player.my_uuid = self.uuid
 
     def receive_round_start_message(self, round_count, hole_card, seats):
-        pass
+        for seat in seats:
+            if Group18Player.my_uuid == seat["uuid"]:
+                Group18Player.my_starting_stack = seat["stack"]
+            else:
+                Group18Player.opp_starting_stack = seat["stack"]
 
     def receive_street_start_message(self, street, round_state):
         pass
@@ -226,12 +231,11 @@ class Group18Player(BasePokerPlayer):
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
-
         def get_real_reward():
-            if winners[0]['uuid'] == self.my_uuid:
-                return winners[0]['stack'] - self.starting_stack
+            if winners[0]['uuid'] == Group18Player.my_uuid:
+                return winners[0]['stack'] - Group18Player.my_starting_stack
             else:
-                return -(winners[0]['stack'] - self.starting_stack)
+                return -(winners[0]['stack'] - Group18Player.opp_starting_stack)
 
         reward = get_real_reward()
         
@@ -247,6 +251,7 @@ class Group18Player(BasePokerPlayer):
 
         for ev in range(len(self.experience_state)):
             self.model.fit(self.experience_state[ev], self.experience_reward[ev], verbose=0)
+
 
 def setup_ai():
     return Group18Player()
