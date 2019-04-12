@@ -144,11 +144,11 @@ class Group18Player(BasePokerPlayer):
         turn_actions = np.zeros((2,6))
         river_actions = np.ones((2,6))
 
-        self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
+        self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']    # this statement is wrong?
         # self.my_cards =  hole_card
         # self.community_card = round_state['community_card']
 
-        starting_stack = 10000
+        starting_stack = 10000          # this is wrong
 
         if self.has_played:
             self.old_state = self.sb_features
@@ -213,12 +213,11 @@ class Group18Player(BasePokerPlayer):
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
-
         def get_real_reward():
             if winners[0]['uuid'] == self.my_uuid:
-                return winners[0]['stack'] - self.starting_stack
+                return winners[0]['stack'] - Group18Player.starting_stack
             else:
-                return -(winners[0]['stack'] - self.starting_stack)
+                return -(winners[0]['stack'] - Group18Player.starting_stack)
 
         reward = get_real_reward()
         self.targetQ[0, int(self.action_sb)] = int(reward)
