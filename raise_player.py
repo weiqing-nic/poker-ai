@@ -51,12 +51,12 @@ class Group18Player(BasePokerPlayer):
         self.action_sb = 3
         # self.table = {}
         # self.my_cards = []
-        self.sb_features = []
+        self.sb_features = None
         self.prev_action_state = []
         self.prev_reward_state = []
         self.has_played = False
         self.model = keras_model()
-        self.target_Q = []
+        self.target_Q = [[0, 0, 0]]
 
     def declare_action(self, valid_actions, hole_card, round_state):
 
@@ -233,10 +233,9 @@ class Group18Player(BasePokerPlayer):
                 return -(winners[0]['stack'] - Group18Player.opp_starting_stack)
 
         reward = get_real_reward()
-        
-        #vurh = int(reward
-        self.target_Q = self.model.predict(self.sb_features)
 
+        print("TARGET Q: {}\t SB_FEATURES: {}".format(self.target_Q, self.sb_features.shape))
+        self.target_Q = self.model.predict(self.sb_features)
         print("HIHIHIHI{}".format(self.action_sb))
         self.target_Q[0, self.action_sb] = int(reward)
         self.prev_action_state.append(self.sb_features)
