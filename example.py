@@ -4,7 +4,7 @@ from raise_player import Group18Player
 # from reinforced_player import RLPlayer
 # from self_player import SelfPlayer
 
-config = setup_config(max_round=1000, initial_stack=10000, small_blind_amount=10)
+config = setup_config(max_round=10, initial_stack=10000, small_blind_amount=10)
 
 config.register_player(name="f1", algorithm=Group18Player())
 config.register_player(name="FT2", algorithm=Group18Player())

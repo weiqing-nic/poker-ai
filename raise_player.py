@@ -51,12 +51,12 @@ class Group18Player(BasePokerPlayer):
         self.action_sb = 3
         # self.table = {}
         # self.my_cards = []
-        self.sb_features = []
-        self.experience_state = []
-        self.experience_reward = []
+        self.sb_features = None
+        self.prev_action_state = []
+        self.prev_reward_state = []
         self.has_played = False
         self.model = keras_model()
-        self.targetQ = []
+        self.target_Q = [[0, 0, 0]]
 
     def declare_action(self, valid_actions, hole_card, round_state):
 
@@ -98,17 +98,17 @@ class Group18Player(BasePokerPlayer):
 
             if self.has_played:
                 reward_sb = Group18Player.y * np.max(self.cur_Q_values)
-                self.targetQ[0, self.action_sb] = reward_sb
+                self.target_Q[0, self.action_sb] = reward_sb
                 self.vvh = self.vvh + 1
                 # new_name = 'my_model_weights'
-                # model.fit(self.old_state,self.targetQ,verbose=0)
-                self.experience_state.append(self.old_state)
-                self.experience_reward.append(self.targetQ)
-                if len(self.experience_state) > Group18Player.max_replay_size:
-                    del self.experience_state[0]
-                    del self.experience_reward[0]
+                # model.fit(self.old_state,self.target_Q,verbose=0)
+                self.prev_action_state.append(self.old_state)
+                self.prev_reward_state.append(self.target_Q)
+                if len(self.prev_action_state) > Group18Player.max_replay_size:
+                    del self.prev_action_state[0]
+                    del self.prev_reward_state[0]
 
-            if self.vvh == 999:
+            if self.vvh > 2000:
                 save_weights()
 
         # Maybe don't modularise this, the program takes up more ram when this is modularised
@@ -126,16 +126,14 @@ class Group18Player(BasePokerPlayer):
 
         def save_weights():
             # new_name = "setup/" + datetime.datetime.now().strftime("%d-%m_%H:%M:%S_") + str(self.vvh) + '.h5'
-            new_name = "setup/" + str(self.vvh) + '.h5'
+            new_name = "setup/training_weights" + '.h5'
             self.model.save_weights(new_name)
 
         #####################################################################
         # SETUPBLOCK - Setup features to train model
 
-        #bb_cards
         preflop_cards = [hole_card[0], hole_card[1]]
 
-        #bb_cards_img = get_street_grid(bb_cards)
         preflop_cards_img = get_street_grid(preflop_cards)
         flop_cards_img = np.zeros((4,13))
         turn_cards_img = np.zeros((4,13))
@@ -146,7 +144,7 @@ class Group18Player(BasePokerPlayer):
         river_actions = np.ones((2,6))
 
 
-        print(round_state)
+        # print(round_state)
 
         if(round_state['next_player'] == round_state['small_blind_pos']):
             sb_position = 1
@@ -154,23 +152,20 @@ class Group18Player(BasePokerPlayer):
             sb_position = 0
 
 
-        print("sb pos")
-        print(sb_position)
+        # print("sb pos")
+        # print(sb_position)
 
-        self.my_uuid =  round_state['seats'][round_state['next_player']]['uuid']
         # self.my_cards =  hole_card
         # self.community_card = round_state['community_card']
 
         starting_stack = round_state['seats'][round_state['next_player']]['stack']
-        print("starting stack is")
-        print(starting_stack)
+        # print("starting stack is")
+        # print(starting_stack)
 
         if self.has_played:
             self.old_state = self.sb_features
-            self.targetQ = self.cur_Q_values
+            self.target_Q = self.cur_Q_values
             #self.old_action = self.action_sb
-
-
 
         preflop_actions = convert_to_image_grid(starting_stack, round_state, 'preflop')
 
@@ -209,8 +204,8 @@ class Group18Player(BasePokerPlayer):
 
         self.has_played = True
 
-        for ve in range(len(self.experience_state)):
-            self.model.fit(self.experience_state[ve], self.experience_reward[ve], verbose=0)
+        for ve in range(len(self.prev_action_state)):
+            self.model.fit(self.prev_action_state[ve], self.prev_reward_state[ve], verbose=0)
 
         return pick_action()
 
@@ -238,19 +233,19 @@ class Group18Player(BasePokerPlayer):
                 return -(winners[0]['stack'] - Group18Player.opp_starting_stack)
 
         reward = get_real_reward()
-        
-        #vurh = int(reward
-        self.targetQ = self.model.predict(self.sb_features)
-        self.targetQ[0, self.action_sb] = int(reward)
-        self.experience_state.append(self.sb_features)
-        self.experience_reward.append(self.targetQ)
 
-        if len(self.experience_state) > Group18Player.max_replay_size:
-            del self.experience_state[0]
-            del self.experience_reward[0]
+        # print("TARGET Q: {}\t SB_FEATURES: {}".format(self.target_Q, self.sb_features))
+        self.target_Q = self.model.predict(self.sb_features)    # need to revise?
+        self.target_Q[0, self.action_sb] = int(reward)
+        self.prev_action_state.append(self.sb_features)
+        self.prev_reward_state.append(self.target_Q)
 
-        for ev in range(len(self.experience_state)):
-            self.model.fit(self.experience_state[ev], self.experience_reward[ev], verbose=0)
+        if len(self.prev_action_state) > Group18Player.max_replay_size:
+            del self.prev_action_state[0]
+            del self.prev_reward_state[0]
+
+        for ev in range(len(self.prev_action_state)):
+            self.model.fit(self.prev_action_state[ev], self.prev_reward_state[ev], verbose=0)
 
 
 def setup_ai():
