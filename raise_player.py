@@ -234,7 +234,8 @@ class Group18Player(BasePokerPlayer):
 
         reward = get_real_reward()
 
-        print("TARGET Q: {}\t SB_FEATURES: {}".format(self.target_Q, self.sb_features))
+        # print("TARGET Q: {}\t SB_FEATURES: {}".format(self.target_Q, self.sb_features))
+        self.target_Q = self.model.predict(self.sb_features)    # need to revise?
         self.target_Q[0, self.action_sb] = int(reward)
         self.prev_action_state.append(self.sb_features)
         self.prev_reward_state.append(self.target_Q)
